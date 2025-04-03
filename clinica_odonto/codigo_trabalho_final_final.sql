@@ -84,3 +84,73 @@ GROUP BY
     d.id, d.nome_completo, d.cro, d.especialidade
 ORDER BY 
     total_consultas_realizadas DESC;
+
+-- Atualizações
+UPDATE pacientes 
+SET telefone = '(11) 90000-0000'
+WHERE cpf = '123.456.789-10';
+
+UPDATE consultas 
+SET status = 'cancelada'
+WHERE data_consulta < NOW();
+
+UPDATE dentistas 
+SET especialidade = 'Clínica Geral'
+WHERE cro = 'CRO-11223';
+
+-- Exclusões
+DELETE FROM pacientes WHERE id = 5;
+DELETE FROM consultas WHERE status = 'cancelada';
+DELETE FROM horarios_atendimento WHERE hora_inicio < '08:00';
+
+-- Consultas
+
+-- 1. Quantidade de consultas por especialidade
+SELECT d.especialidade, COUNT(c.id) AS total_consultas
+FROM dentistas d
+LEFT JOIN consultas c ON d.id = c.dentista_id
+GROUP BY d.especialidade
+ORDER BY total_consultas DESC;
+
+-- 2. Quantidade de consultas realizadas por dentista
+SELECT d.nome_completo, COUNT(c.id) AS total_consultas
+FROM dentistas d
+LEFT JOIN consultas c ON d.id = c.dentista_id
+WHERE c.status = 'realizada'
+GROUP BY d.nome_completo
+ORDER BY total_consultas DESC;
+
+-- 3. Pacientes com mais consultas realizadas
+SELECT p.nome_completo, COUNT(c.id) AS total_consultas
+FROM pacientes p
+LEFT JOIN consultas c ON p.id = c.paciente_id
+WHERE c.status = 'realizada'
+GROUP BY p.nome_completo
+ORDER BY total_consultas DESC;
+
+-- 4. View com lista de consultas ordenadas por data
+CREATE OR REPLACE VIEW vw_lista_consultas AS
+SELECT 
+    c.id AS id_consulta,
+    p.nome_completo AS nome_paciente,
+    d.nome_completo AS nome_dentista,
+    c.data_consulta,
+    STRING_AGG(pr.nome, ', ') AS procedimentos_realizados
+FROM consultas c
+JOIN pacientes p ON c.paciente_id = p.id
+JOIN dentistas d ON c.dentista_id = d.id
+LEFT JOIN consultas_procedimentos cp ON c.id = cp.consulta_id
+LEFT JOIN procedimentos pr ON cp.procedimento_id = pr.id
+GROUP BY c.id, p.nome_completo, d.nome_completo, c.data_consulta
+ORDER BY c.data_consulta DESC;
+
+-- 5. Média de consultas por dentista
+SELECT d.nome_completo, ROUND(AVG(consultas_por_dentista), 2) AS media_consultas
+FROM (
+    SELECT dentista_id, COUNT(*) AS consultas_por_dentista
+    FROM consultas
+    WHERE status = 'realizada'
+    GROUP BY dentista_id
+) subquery
+JOIN dentistas d ON subquery.dentista_id = d.id
+GROUP BY d.nome_completo;
